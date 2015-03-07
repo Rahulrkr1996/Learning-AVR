@@ -1,0 +1,115 @@
+/*
+ * MPU6050.c
+ *
+ * Created: 07-03-2015 18:16:48
+ *  Author: Rahul kumar
+ */ 
+
+
+#define F_CPU 16000000UL
+#include <avr/io.h>
+#include <util/delay.h>
+#include <inttypes.h>
+#define USART_BAUDRATE 38400
+#define BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16))) - 1)
+
+unsigned char wd=0x01;
+unsigned char Slave_uC_address=0x20,Data;
+int write=0,read=1;
+
+
+void TWI_init_master(void) // Function to initialize master, Setting up SCL.
+{
+	TWBR=0x01; // Bit rate
+	TWSR|=(0<<TWPS1)|(0<<TWPS0); // Setting prescalar bits
+	// Therefore SCL=2 MHz (Formula)
+}
+
+void TWI_Start()     // Sending Start condition
+{
+   TWCR|=(1<<TWEN)|(1<<TWSTA)|(1<<TWINT); //Enable the device, set it to master, Start communication.
+
+   while(!(TWCR & (1<<TWINT))); // Wait till start condition is transmitted
+   while((TWSR & 0xF8)!= 0x08); // Check for the acknowledgement at start condition.(is TWSR == 01000_ _ _  )
+}
+
+void TWI_Repeat_Start() //Sending Repeat start condition
+{
+	TWCR= (1<<TWINT)|(1<<TWSTA)|(1<<TWEN);  //Enable the device, set it to master, Start communication.
+	while(!(TWCR & (1<<TWINT)));  // Wait till start condition is transmitted
+	while((TWSR & 0xF8)!= 0x10);   // Check for the acknowledgement at start condition.(is TWSR == 01000_ _ _  )
+} 
+
+void TWI_Master_write_address(unsigned char add)
+{
+	TWDR=add; // Address and write instruction
+	TWCR|=(1<<TWINT)|(1<<TWEN);    // Clear TWI interrupt flag,Enable TWI
+	while (!(TWCR & (1<<TWINT))); // Wait till complete TWDR byte transmitted
+	while((TWSR & 0xF8)!= 0x18);  // Check for the SLAVE add+W has been transmitted ACK has been received.
+}
+
+void TWI_Master_read_address(unsigned char Slave_Address)
+{
+	TWDR=Slave_Address; // Address and write instruction
+	TWCR=(1<<TWINT)|(1<<TWEN);    // Clear TWI interrupt flag,Enable TWI
+	while (!(TWCR & (1<<TWINT))); // Wait till complete TWDR byte transmitted
+	while((TWSR & 0xF8)!= 0x40);  // Check for the SLAVE add+R has been transmitted ACK has been received.
+}
+
+void TWI_Master_write_data(unsigned char Data)
+{   TWDR=Data;
+	TWCR=(1<<TWINT)|(1<<TWEN);    // Clear TWI interrupt flag,Enable TWI
+	while (!(TWCR & (1<<TWINT))); // Wait till complete TWDR byte transmitted
+	while((TWSR & 0xF8) != 0x28); // Check for the acknoledgement
+}
+
+
+unsigned char TWI_Master_read_data()
+{
+	TWCR=(1<<TWINT)|(1<<TWEN);
+	while (!(TWCR & (1<<TWINT)));
+	while((TWSR & 0xF8) != 0x58);
+	Data=TWDR;
+	if (Data>50)
+	{
+		PORTB=0b10101010;
+	}
+	else PORTB=0b01010101;;
+
+return Data;
+}
+
+void TWI_Stop()
+{
+	TWCR=(1<<TWINT)|(1<<TWEN)|(1<<TWSTO);
+	while (!(TWCR & (1<<TWSTO))); // Wait till complete TWDR byte transmitted
+}
+
+int main()
+{
+	DDRB=255;
+	DDRA=255;
+	TWI_init_master();  
+	unsigned char GY_XOUT_H,GY_XOUT_L;
+	
+	while(1)
+	{PORTB=0b11111111; PORTA=255;
+		TWI_Start(); 
+		TWI_Master_read_address(0x44+read); 
+		GY_XOUT_H=TWI_Master_read_data();  // Gyro XOUTH
+		TWI_Stop(); 
+		_delay_ms(100); 
+		TWI_Start();
+		TWI_Master_read_address(0x43+read);
+		GY_XOUT_L=TWI_Master_read_data();  // Gyro XOUTL
+		TWI_Stop();
+		uint16_t xout=(GY_XOUT_H<<8)|(GY_XOUT_L);
+		
+		PORTB=GY_XOUT_H; PORTA=GY_XOUT_L; // PORTB shows XOUTH,PORTC shows XOUTL
+			
+		_delay_ms(1000);
+	}
+	
+	
+	
+}
