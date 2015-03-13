@@ -1,0 +1,91 @@
+/*
+ * TWI_Micro_Device2.c
+ *
+ * Created: 02-03-2015 19:20:11
+ *  Author: Rahul kumar
+ */ 
+
+
+#include <avr/io.h>
+#include <util/delay.h>
+#include <stdio.h>
+#include <math.h>
+
+#define F_CPU 16000000UL
+unsigned char Slave_uC_address=0x20;
+int write=0,read=1;
+
+ unsigned char data=65;
+
+
+
+void TWI_init_Slave()
+{
+  TWAR=Slave_uC_address;	// Give Unique Slave add to the uC 	
+}
+
+void TWI_Slave_write(unsigned char Data) // Function to write data
+{
+	TWDR= Data;           // Fill TWDR register whith the data to be sent
+	TWCR= (1<<TWEN)|(1<<TWINT);   // Enable TWI, Clear TWI interrupt flag
+	while((TWSR & 0xF8) != 0xC0); // Wait for the acknowledgement
+}
+
+void TWI_Slave_read()
+{   
+	// Clear TWI interrupt flag,Get acknowlegement, Enable TWI
+	TWCR= (1<<TWINT)|(1<<TWEA)|(1<<TWEN);
+	while (!(TWCR & (1<<TWINT))); // Wait for TWINT flag
+	while((TWSR & 0xF8)!=0x80); // Wait for acknowledgement
+	data=TWDR; // Get value from TWDR
+	PORTB=data; // send the receive value on PORTB
+    _delay_ms(2000);
+    PORTB=0;
+}
+
+void TWI_Slave_match_write(void) //Function to match the slave address and slave dirction bit(write)
+{
+	while((TWSR & 0xF8)!= 0xA8) // Loop till correct acknoledgement have been received
+	{
+		// Get acknowlegement, Enable TWI, Clear TWI interrupt flag
+		TWCR=(1<<TWEA)|(1<<TWEN)|(1<<TWINT);
+		while (!(TWCR & (1<<TWINT)));  // Wait for TWINT flag
+	}
+}
+
+void TWI_Slave_match_read(void) //Function to match the slave address and slave dirction bit(read)
+{
+	while((TWSR & 0xF8)!= 0x60)  // Loop till correct acknoledgement have been received
+	{
+		// Get acknowlegement, Enable TWI, Clear TWI interrupt flag
+		TWCR=(1<<TWEA)|(1<<TWEN)|(1<<TWINT);
+		while (!(TWCR & (1<<TWINT)));  // Wait for TWINT flag
+	}
+}
+
+
+void TWI_Stop()
+{
+	TWCR=(1<<TWINT)|(1<<TWEN)|(1<<TWSTO);
+	while (!(TWCR & (1<<TWSTO))); // Wait till complete TWDR byte transmitted
+}
+
+int main(void)
+{  
+	DDRB=255;
+	TWI_init_Slave();
+//	int i=0;
+    while(1)
+    { 	
+	  TWI_Slave_match_read();
+	  TWI_Slave_read();	
+	  
+	  //PORTB=data;
+	  //_delay_ms(500);
+     //
+	 /*
+      TWI_Slave_match_write();
+	  TWI_Slave_write(i); 
+	 */
+	}
+}
