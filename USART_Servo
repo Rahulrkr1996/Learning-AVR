@@ -1,0 +1,84 @@
+/*
+ * USART_Receive.c
+ *
+ * Created: 28-02-2015 16:00:41
+ *  Author: Rahul kumar
+ */ 
+
+
+#include <avr/io.h>
+#include <util/delay.h>
+#include <stdio.h>
+#include <math.h>
+
+#define Servo_0 0.6
+#define Servo_90 1.5
+#define Servo_180 2.40
+
+#define F_CPU 16000000
+#define BAUD 9600
+#define UBRR 103
+
+void Timer_init() 
+{
+	TCCR1A|=(0<<WGM10)|(1<<WGM11)|(1<<COM1A1)|(1<<COM1B1);
+	TCCR1B|=(1<<CS10)|(1<<CS11)|(1<<WGM12)|(1<<WGM13);   // Prescalar=64
+}
+
+void ADC_init(void)
+{
+	ADCSRA|=(1<<ADEN)|(1<<ADPS2) |(1<<ADPS1) |(1<<ADPS0);
+}
+
+void USART_init()
+{
+	UCSRB|=(1<<RXEN)|(0<<TXEN)	;
+	UCSRC|=(1<<UMSEL)|(1<<USBS)|(1<<UCSZ0)|(1<<UCSZ1)  ;
+	
+}
+
+void USART_Transmit( unsigned char data )
+{
+	/* Wait for empty transmit buffer */
+	while ( !( UCSRA & (1<<UDRE)) );
+	/* Put data into buffer, sends the data */
+	UDR = data;
+}
+
+unsigned char USART_Receive( void )
+{
+	/* Wait for data to be received */
+	while ( !(UCSRA & (1<<RXC)) ) ; // w8 Until (RXC flag == 0) , when  it is equal to 0, buffer has unread data.
+	
+	/* Get and return received data from buffer ,i.e-read the data*/
+	return UDR;
+}
+
+
+
+int main(void)
+{ DDRD|=(1<<4)|(1<<5) ; //OCR1A,OCR1B
+  DDRB=255;
+  Timer_init();
+  USART_init();
+  int Data[3],degree=0;
+  char x;
+  while(1)
+  {  
+	  for(int i=0;i<3;i++)
+	   {  
+		  x=USART_Receive();
+          x=x-'0';    
+		  Data[i]=(int)x;
+		  degree+=(pow(10,(2-i)))*Data[i] ;		   
+	   }	  
+	   
+	   USART_Transmit('y');
+	  float ticks=150+(2.5*degree);
+	  OCR1A=(int)ticks;
+	  _delay_ms(100);
+	  
+	  
+	  PORTB=Data;     
+  }
+}
